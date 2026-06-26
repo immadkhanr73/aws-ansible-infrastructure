@@ -61,7 +61,7 @@
         name: Database-SG
         description: "Only accepts traffic from APP-SG. NO OUTBOUND ALLOWED."
         region: "{{ aws_region }}"
-        purge_rules_egress: true
+        purge_rules_egress: false
         rules:
           - proto: tcp
             ports: [3306]
