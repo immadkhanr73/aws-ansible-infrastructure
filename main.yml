@@ -1,2 +1,2 @@
 ---
-- import_playbook: security_group.yml
+- import_playbook: security_groups.yml
