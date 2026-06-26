@@ -21,7 +21,7 @@ jobs:
 
       # We replaced the Python/pip setup with a simple Docker build!
       - name: Build Docker Image
-        run: docker build -t aws-ansible-runner .
+        run: docker buil -t aws-ansible-runner .
 
       - name: Run Ansible Syntax Check in Docker
         # Notice we are running the container and overriding the command to do a syntax check
