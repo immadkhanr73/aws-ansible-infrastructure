@@ -1,6 +1,5 @@
 name: Ansible AWS CI/CD Pipeline
 
-# Trigger the pipeline on pushes to the main branch
 on:
   push:
     branches:
@@ -11,64 +10,44 @@ on:
 
 jobs:
   # -------------------------------------------------------------
-  # STAGE 1: TESTING (Continuous Integration)
+  # STAGE 1: TESTING (Continuous Integration via Docker)
   # -------------------------------------------------------------
   test-ansible-code:
-    name: Test Ansible Syntax & Dependencies
+    name: Test Ansible Syntax (via Docker)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      # We replaced the Python/pip setup with a simple Docker build!
+      - name: Build Docker Image
+        run: docker build -t aws-ansible-runner .
 
-      - name: Install Ansible & AWS Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ansible boto3 botocore
-          ansible-galaxy collection install amazon.aws community.aws
-
-      - name: Run Ansible Syntax Check
-        # This is your Testing stage. It simulates a run to catch YAML formatting 
-        # errors, missing variables, or broken module references before deployment.
-        run: ansible-playbook --syntax-check main.yml
+      - name: Run Ansible Syntax Check in Docker
+        # Notice we are running the container and overriding the command to do a syntax check
+        run: docker run aws-ansible-runner ansible-playbook --syntax-check main.yml
 
   # -------------------------------------------------------------
-  # STAGE 2: DEPLOYMENT (Continuous Deployment)
+  # STAGE 2: DEPLOYMENT (Continuous Deployment via Docker)
   # -------------------------------------------------------------
   deploy-to-aws:
-    name: Deploy Infrastructure to AWS
+    name: Deploy Infrastructure to AWS (via Docker)
     runs-on: ubuntu-latest
-    needs: test-ansible-code # This ensures deployment ONLY runs if the testing stage passes
-    # Only run the actual deployment on the main branch, not on pull requests
+    needs: test-ansible-code 
     if: github.ref == 'refs/heads/main' 
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Build Docker Image
+        run: docker build -t aws-ansible-runner .
 
-      - name: Install Ansible & AWS Dependencies
+      - name: Deploy Infrastructure using Docker
+        # Here we run the container and securely inject the AWS keys from GitHub Secrets
         run: |
-          python -m pip install --upgrade pip
-          pip install ansible boto3 botocore
-          ansible-galaxy collection install amazon.aws community.aws
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          # You will need to add these as Repository Secrets in your GitHub repo settings
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Run Main Orchestrator Playbook
-        # Deploys the security groups and then provisions the servers
-        run: ansible-playbook main.yml
+          docker run \
+            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -e AWS_DEFAULT_REGION="us-east-1" \
+            aws-ansible-runner
