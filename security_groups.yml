@@ -1,0 +1,79 @@
+---
+- name: Ansible Drift Remediation
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    aws_region: us-east-1
+    discord_webhook: "https://discordapp.com/api/webhooks/1517590968008708237/STDreI_3coZzH5Hpwzl_2Nx1x9ryhd1vuVYYEiWaTjFni0zmTJJaUMaKUv8r7NBMyPRD"
+
+  tasks:
+    - name: 1. ALB-SG (Load Balancer)
+      amazon.aws.ec2_security_group:
+        name: ALB-SG
+        description: "Public internet access to the Load Balancer"
+        region: "{{ aws_region }}"
+        purge_rules_egress: true
+        rules:
+          - proto: tcp
+            ports: [80, 443]
+            cidr_ip: 0.0.0.0/0
+        rules_egress:
+          - proto: tcp
+            ports: [80]
+            cidr_ip: 0.0.0.0/0
+      register: alb_sg
+
+    - name: 2. Web Server - Locked to ALB
+      amazon.aws.ec2_security_group:
+        name: Web-SG
+        description: "Web tier - strictly accepts traffic only from ALB-SG"
+        region: "{{ aws_region }}"
+        purge_rules_egress: true
+        rules:
+          - proto: tcp
+            ports: [80]
+            group_id: "{{ alb_sg.group_id }}"
+        rules_egress:
+          - proto: tcp
+            ports: [8080]
+            cidr_ip: 0.0.0.0/0
+      register: web_sg
+
+    - name: 3. App Server
+      amazon.aws.ec2_security_group:
+        name: App-SG
+        description: "Only accepts traffic from Web-SG"
+        region: "{{ aws_region }}"
+        purge_rules_egress: true
+        rules:
+          - proto: tcp
+            ports: [8080]
+            group_id: "{{ web_sg.group_id }}"
+        rules_egress:
+          - proto: tcp
+            ports: [3306]
+            cidr_ip: 0.0.0.0/0
+      register: app_sg
+
+    - name: 4. Database Server
+      amazon.aws.ec2_security_group:
+        name: Database-SG
+        description: "Only accepts traffic from APP-SG. NO OUTBOUND ALLOWED."
+        region: "{{ aws_region }}"
+        purge_rules_egress: true
+        rules:
+          - proto: tcp
+            ports: [3306]
+            group_id: "{{ app_sg.group_id }}"
+        rules_egress: []
+      register: database_sg
+
+    - name: 5. Alert Security Team if Firewall Drift is Detected
+      ansible.builtin.uri:
+        url: "{{ discord_webhook }}"
+        method: POST
+        body_format: json
+        body:
+          content: "🚨 **SECURITY ALERT**: Configuration drift detected and automatically remediated on your AWS Security Groups!"
+      when: alb_sg.changed or web_sg.changed or app_sg.changed or database_sg.changed

@@ -1,0 +1,48 @@
+---
+- name: Destroy Elastic Infrastructure (Cost Saving)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    aws_region: us-east-1
+
+  tasks:
+    - name: 1. Delete Auto Scaling Group
+      amazon.aws.ec2_asg:
+        name: Web-ASG
+        region: "{{ aws_region }}"
+        state: absent
+
+    - name: 2. Delete Launch Template
+      amazon.aws.ec2_launch_template:
+        name: Web-Server-Template
+        region: "{{ aws_region }}"
+        state: absent
+
+    - name: 3. Delete Application Load Balancer
+      community.aws.elb_application_lb:
+        name: Web-ALB
+        region: "{{ aws_region }}"
+        state: absent
+
+    - name: 4. Delete Target Group
+      community.aws.elb_target_group:
+        name: Web-Target-Group
+        region: "{{ aws_region }}"
+        state: absent
+
+    - name: 5. Terminate App Server
+      amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        state: absent
+        filters:
+          "tag:Name": "App-Server"
+          instance-state-name: running
+
+    - name: 6. Terminate Database Server
+      amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        state: absent
+        filters:
+          "tag:Name": "Database-Server"
+          instance-state-name: running
