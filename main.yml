@@ -1,3 +1,2 @@
 ---
 - import_playbook: security_groups.yml
-- import_playbook: fake_servers.yml
