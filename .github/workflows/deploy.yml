@@ -19,12 +19,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # We replaced the Python/pip setup with a simple Docker build!
       - name: Build Docker Image
         run: docker build -t aws-ansible-runner .
 
       - name: Run Ansible Syntax Check in Docker
-        # Notice we are running the container and overriding the command to do a syntax check
+     
         run: docker run aws-ansible-runner ansible-playbook --syntax-check main.yml
 
   # -------------------------------------------------------------
@@ -44,7 +43,7 @@ jobs:
         run: docker build -t aws-ansible-runner .
 
       - name: Deploy Infrastructure using Docker
-        # Here we run the container and securely inject the AWS keys from GitHub Secrets
+  
         run: |
           docker run \
             -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
